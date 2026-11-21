@@ -1,0 +1,253 @@
+1. Single-Port RAM (SPR)
+Definition
+A Single-Port RAM is a Random Access Memory that has only one access port for both read and write operations.
+It is used to store and retrieve data from memory locations.
+
+Why is it called Single-Port RAM?
+
+Because it has only one address and data access port. It can perform only one memory operation at a time.
+Basic Architecture
+- Memory: Stores data.
+- Address: Selects the memory location.
+- Data Input (DIN): Data to be written.
+- Data Output (DOUT): Data to be read.
+- Write Enable (WE): Controls the write operation.
+- Clock (CLK): Synchronizes memory operations.
+Parameters
+- DATA_WIDTH = 8 bits
+- ADDR_WIDTH = 4 bits
+- Memory Depth = 2⁴ = 16 locations
+- Total Memory = 16 × 8 = 128 bits (16 bytes).
+Write Operation:
+1. Set WE = 1.
+2. Provide the memory address.
+3. Apply input data.
+4. At the positive clock edge, data is stored.
+Read Operation:
+1. Set WE = 0.
+2. Provide the memory address.
+3. At the positive clock edge, stored data appears at DOUT.
+Verilog Design Concept
+- Use a memory array.
+- Use always @(posedge clk).
+- Use if (we) for writing.
+- Use dout <= mem[addr] for reading.
+- Use non-blocking assignment (<=) for sequential logic.
+Important: In this design, reading is synchronous. During a write, DOUT receives the previous contents of the addressed location because non-blocking assignments update after the clock event.
+2. Dual-Port RAM (DPR)
+Definition
+Dual-Port RAM is a memory that provides two independent access ports.
+
+Both ports can access memory independently.
+
+It supports simultaneous read and write operations through separate ports, subject to memory access restrictions.
+Why is it called Dual-Port RAM?
+Because it has two independent access ports:
+- Port A
+- Port B
+Each port has its own address, data input, data output, write enable, and clock.
+Signals
+Port A:
+- CLK_A – Clock input.
+- WE_A – Write enable.
+- ADDR_A – Memory address.
+- DATA_IN_A – Input data.
+- DATA_OUT_A – Output data.
+Port B:
+- CLK_B – Clock input.
+- WE_B – Write enable.
+- ADDR_B – Memory address.
+- DATA_IN_B – Input data.
+- DATA_OUT_B – Output data.
+Working Operation
+Port A:
+- Writes data into memory.
+- Reads data from memory.
+- Operates using CLK_A.
+Port B:
+- Writes data into memory.
+- Reads data from memory.
+- Operates using CLK_B.
+Both ports can access different memory addresses simultaneously.
+Example
+Port	Address	Operation	Data
+A	4	Write	AA
+B	8	Write	BB
+A	4	Read	AA
+B	8	Read	BB
+
+
+Verilog Design Concept
+- Declare a common memory array.
+- Create separate clocked processes for Port A and Port B.
+- Use independent write-enable signals.
+- Use independent address signals.
+- Use separate input and output data signals.
+Important: If both ports access the same memory address simultaneously, especially when one or both write, the result may be undefined or device-dependent. Proper collision handling is required.
+
+3. Single-Port RAM vs Dual-Port RAM
+Feature	Single-Port RAM	Dual-Port RAM
+Number of ports	1	2
+Clock	1	1 or 2
+Address inputs	1	2
+Data inputs	1	2
+Data outputs	1	2
+Simultaneous access	No	Yes, subject to restrictions
+Complexity	Low	Higher
+
+
+4. Applications
+Single-Port RAM:
+1. Microcontroller memory.
+2. Small embedded systems.
+3. Data buffering.
+4. Register-based storage.
+
+Dual-Port RAM:
+1. FIFO memory.
+2. FPGA-based systems.
+3. Processor communication.
+4. Video and image processing.
+5. Data transfer between different clock domains.
+ Verilog code:
+module dual_port_ram #(
+    parameter DATA_WIDTH = 8,
+    parameter ADDR_WIDTH = 4
+)(
+    // Port A
+    input wire clk_a,
+    input wire we_a,
+    input wire [ADDR_WIDTH-1:0] addr_a,
+    input wire [DATA_WIDTH-1:0] data_in_a,
+    output reg [DATA_WIDTH-1:0] data_out_a,
+
+    // Port B
+    input wire clk_b,
+    input wire we_b,
+    input wire [ADDR_WIDTH-1:0] addr_b,
+    input wire [DATA_WIDTH-1:0] data_in_b,
+    output reg [DATA_WIDTH-1:0] data_out_b
+);
+
+    // Common Memory
+    reg [DATA_WIDTH-1:0] mem [0:(1<<ADDR_WIDTH)-1];
+
+    // Port A Operation
+    always @(posedge clk_a) begin
+
+        if (we_a)
+            mem[addr_a] <= data_in_a;
+
+        data_out_a <= mem[addr_a];
+
+    end
+
+    // Port B Operation
+    always @(posedge clk_b) begin
+
+        if (we_b)
+            mem[addr_b] <= data_in_b;
+
+        data_out_b <= mem[addr_b];
+
+    end
+
+endmodule
+
+Test bench :
+`timescale 1ns/1ps
+
+module tb_dual_port_ram;
+
+    parameter DATA_WIDTH = 8;
+    parameter ADDR_WIDTH = 4;
+
+    // Port A
+    reg clk_a;
+    reg we_a;
+    reg [ADDR_WIDTH-1:0] addr_a;
+    reg [DATA_WIDTH-1:0] data_in_a;
+    wire [DATA_WIDTH-1:0] data_out_a;
+
+    // Port B
+    reg clk_b;
+    reg we_b;
+    reg [ADDR_WIDTH-1:0] addr_b;
+    reg [DATA_WIDTH-1:0] data_in_b;
+    wire [DATA_WIDTH-1:0] data_out_b;
+
+    // DUT Instantiation
+    dual_port_ram uut (
+        .clk_a(clk_a),
+        .we_a(we_a),
+        .addr_a(addr_a),
+        .data_in_a(data_in_a),
+        .data_out_a(data_out_a),
+
+        .clk_b(clk_b),
+        .we_b(we_b),
+        .addr_b(addr_b),
+        .data_in_b(data_in_b),
+        .data_out_b(data_out_b)
+    );
+
+    // Clock A: 10ns Period
+    always #5 clk_a = ~clk_a;
+
+    // Clock B: 15ns Period
+    always #7.5 clk_b = ~clk_b;
+
+    initial begin
+
+        $dumpfile("dual_port_ram.vcd");
+        $dumpvars(0, tb_dual_port_ram);
+
+        clk_a = 0;
+        clk_b = 0;
+
+        we_a = 0;
+        we_b = 0;
+
+        addr_a = 0;
+        addr_b = 0;
+
+        data_in_a = 0;
+        data_in_b = 0;
+
+        // Port A Write
+        @(negedge clk_a);
+        we_a = 1;
+        addr_a = 4;
+        data_in_a = 8'hAA;
+
+        // Port B Write
+        @(negedge clk_b);
+        we_b = 1;
+        addr_b = 8;
+        data_in_b = 8'hBB;
+
+        // Disable Write
+        @(negedge clk_a);
+        we_a = 0;
+
+        @(negedge clk_b);
+        we_b = 0;
+
+        // Port A Read
+        addr_a = 4;
+
+        // Port B Read
+        addr_b = 8;
+
+        #30;
+
+        $display("Port A Output = %h", data_out_a);
+        $display("Port B Output = %h", data_out_b);
+
+        $display("Simulation Completed");
+
+        $finish;
+
+    end
+
+endmodule
